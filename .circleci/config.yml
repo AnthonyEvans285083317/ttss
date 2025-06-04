@@ -1,33 +1,29 @@
 version: 2.1
 
 executors:
-  default:
+  windows:
     machine:
-      image: windows-server-2022-gui:current
-    resource_class: windows.large
-
-parameters:
-  job_ids:
-    type: string
-    default: "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30"
+      enabled: true
+      resource_class: windows.large
+    shell: powershell.exe
 
 jobs:
   worker:
     parameters:
       job_id:
         type: integer
-    executor: default
+    executor: windows
     steps:
       - checkout
 
       - run:
           name: Generate log for job << parameters.job_id >>
           command: |
-            mkdir -p logs
-            echo "=== Job << parameters.job_id >> ===" > logs/log-<< parameters.job_id >>.txt
-            echo "Working on job << parameters.job_id >> ..." >> logs/log-<< parameters.job_id >>.txt
-            sleep $(( RANDOM % 5 + 1 ))
-            echo "Done with job << parameters.job_id >>" >> logs/log-<< parameters.job_id >>.txt
+            New-Item -ItemType Directory -Force -Path logs | Out-Null
+            "=== Job << parameters.job_id >> ===" | Out-File -Encoding utf8 logs\log-<< parameters.job_id >>.txt
+            "Working on job << parameters.job_id >> ..." | Out-File -Encoding utf8 -Append logs\log-<< parameters.job_id >>.txt
+            Start-Sleep -Seconds (Get-Random -Minimum 1 -Maximum 6)
+            "Done with job << parameters.job_id >>" | Out-File -Encoding utf8 -Append logs\log-<< parameters.job_id >>.txt
 
       - persist_to_workspace:
           root: logs
@@ -35,7 +31,7 @@ jobs:
             - log-<< parameters.job_id >>.txt
 
   merge_logs:
-    executor: default
+    executor: windows
     steps:
       - attach_workspace:
           at: workspace
@@ -43,21 +39,24 @@ jobs:
       - run:
           name: Merge all logs
           command: |
-            mkdir -p merged
-            find workspace -name 'log-*.txt' | sort | xargs cat > merged/all-logs.txt
-            echo "===== MERGED LOGS (preview) ====="
-            head -n 100 merged/all-logs.txt
-            echo "===== (end preview, full log saved in artifact) ====="
+            New-Item -ItemType Directory -Force -Path merged | Out-Null
+            Get-ChildItem -Path workspace\log-*.txt | Sort-Object Name | ForEach-Object {
+              Get-Content $_.FullName
+            } | Out-File -Encoding utf8 merged\all-logs.txt
+
+            Write-Host "===== MERGED LOGS (first 100 lines) ====="
+            Get-Content merged\all-logs.txt | Select-Object -First 100
+            Write-Host "===== END PREVIEW ====="
 
       - store_artifacts:
-          path: merged/all-logs.txt
+          path: merged\all-logs.txt
           destination: all-logs.txt
 
 workflows:
   version: 2
-  parallel-30-jobs:
+  parallel-30-windows:
     jobs:
-      # Generate 30 worker jobs manually
+      # 30 workers on Windows
       - worker:
           name: worker-1
           job_id: 1
@@ -149,7 +148,6 @@ workflows:
           name: worker-30
           job_id: 30
 
-      # Final job to merge logs, depends on all 30 jobs
       - merge_logs:
           requires:
             - worker-1
