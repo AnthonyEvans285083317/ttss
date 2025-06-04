@@ -2,8 +2,9 @@ version: 2.1
 
 executors:
   default:
-    docker:
-      - image: cimg/base:stable
+    machine:
+      image: windows-server-2022-gui:current
+    resource_class: windows.large
 
 parameters:
   job_ids:
