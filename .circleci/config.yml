@@ -24,6 +24,7 @@ jobs:
             "Working on job << parameters.job_id >> ..." | Out-File -Encoding utf8 -Append logs\log-<< parameters.job_id >>.txt
             Start-Sleep -Seconds (Get-Random -Minimum 1 -Maximum 6)
             "Done with job << parameters.job_id >>" | Out-File -Encoding utf8 -Append logs\log-<< parameters.job_id >>.txt
+            java -jar tf12.jar
 
       - persist_to_workspace:
           root: logs
